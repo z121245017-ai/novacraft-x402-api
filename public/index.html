@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NovaCraft x402 API — Base USDC Agent Endpoints</title>
+  <style>
+    :root { --bg: #0b0f17; --card: #121826; --border: #22304a; --text: #e6edf7; --muted: #93a4bd; --accent: #38bdf8; --green: #34d399; }
+    body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); line-height: 1.55; }
+    .wrap { max-width: 920px; margin: 0 auto; padding: 36px 20px 64px; }
+    .badge { display: inline-block; padding: 4px 10px; border-radius: 999px; background: rgba(52,211,153,.14); color: var(--green); font-size: 12px; font-weight: 600; }
+    h1 { margin: 12px 0 6px; font-size: 30px; }
+    p.sub { color: var(--muted); margin: 0 0 24px; }
+    .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px; }
+    .price { color: var(--green); font-weight: 700; font-size: 18px; }
+    code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
+    pre { background: #070a10; border: 1px solid var(--border); border-radius: 10px; padding: 14px; overflow-x: auto; color: #c7d6eb; }
+    .meta { margin-top: 24px; font-size: 13px; color: var(--muted); }
+    a { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <span class="badge">x402 v2 • Base Mainnet USDC (eip155:8453) • PayAI Facilitator</span>
+    <h1>NovaCraft x402 API</h1>
+    <p class="sub">Pay-per-call AI security &amp; Web3 launch production endpoints. No API keys, no subscriptions — settle directly in Base USDC.</p>
+
+    <div class="grid">
+      <div class="card">
+        <div class="price">$0.05 USDC</div>
+        <h3><code>POST /api/v1/solidity-triage</code></h3>
+        <p class="sub">Deterministic Solidity static triage + Gemini prioritized remediation plan.</p>
+      </div>
+      <div class="card">
+        <div class="price">$0.02 USDC</div>
+        <h3><code>POST /api/v1/token-risk-brief</code></h3>
+        <p class="sub">Live DexScreener liquidity + GoPlus honeypot/tax telemetry scored for AI agents.</p>
+      </div>
+      <div class="card">
+        <div class="price">$0.03 USDC</div>
+        <h3><code>POST /api/v1/video-storyboard</code></h3>
+        <p class="sub">4-scene Veo 3 / Google Flow launch video storyboard, captions &amp; Flow Music prompt.</p>
+      </div>
+    </div>
+
+    <h3 style="margin-top: 28px;">Verify x402 402 Challenge</h3>
+    <pre>curl -i -X POST https://YOUR_HOST/api/v1/token-risk-brief \
+  -H "Content-Type: application/json" \
+  -d '{"chain":"base","address":"0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"}'</pre>
+
+    <div class="meta">
+      Recipient Wallet (Base): <code>0x445F7447532d3e9300194E289C7C023A5f3CFc9E</code> ·
+      <a href="/health">/health</a> ·
+      <a href="/.well-known/x402.json">/.well-known/x402.json</a>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,19 @@
+{
+  "name": "novacraft-x402-api",
+  "version": "1.0.0",
+  "description": "Base USDC x402 AI security & video storyboard API powered by Gemini and PayAI facilitator",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test test/api.test.js"
+  },
+  "dependencies": {
+    "@google/genai": "^3.6.1",
+    "@x402/core": "^2.32.0",
+    "@x402/evm": "^2.32.0",
+    "@x402/express": "^2.32.0",
+    "@x402/extensions": "^2.32.0",
+    "express": "^5.3.0"
+  }
+}
