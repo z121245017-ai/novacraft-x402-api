@@ -216,3 +216,113 @@ test("5. buildStoryboardPlan produces 4 structured scenes and Flow Music score",
   assert.ok(plan.flowMusicPrompt.length > 20);
   assert.match(plan.scenes[1].visualPrompt, /Halo2 ZK nullifier/);
 });
+
+test("6. Streamable HTTP /mcp supports initialize, tools/list, unpaid 402 challenge, and rejects invalid x402 payment", async () => {
+  const { server, baseUrl } = await startTestServer();
+  try {
+    const mcpUrl = `${baseUrl}/mcp`;
+    const commonHeaders = {
+      "Content-Type": "application/json",
+      Accept: "application/json, text/event-stream",
+      "Mcp-Protocol-Version": "2025-06-18",
+    };
+
+    // 1. initialize
+    const initRes = await fetch(mcpUrl, {
+      method: "POST",
+      headers: commonHeaders,
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "initialize",
+        params: {
+          protocolVersion: "2025-06-18",
+          capabilities: {},
+          clientInfo: { name: "paidmcp-directory-checker", version: "1.0.0" },
+        },
+      }),
+    });
+    assert.equal(initRes.status, 200);
+    const sessionId = initRes.headers.get("mcp-session-id");
+    assert.ok(sessionId);
+    const initBody = await initRes.json();
+    assert.equal(initBody.result.protocolVersion, "2025-06-18");
+
+    // 2. notifications/initialized
+    const notifRes = await fetch(mcpUrl, {
+      method: "POST",
+      headers: { ...commonHeaders, "Mcp-Session-Id": sessionId },
+      body: JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }),
+    });
+    assert.equal(notifRes.status, 202);
+
+    // 3. tools/list
+    const listRes = await fetch(mcpUrl, {
+      method: "POST",
+      headers: { ...commonHeaders, "Mcp-Session-Id": sessionId },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} }),
+    });
+    assert.equal(listRes.status, 200);
+    const listBody = await listRes.json();
+    const toolNames = listBody.result.tools.map((t) => t.name);
+    assert.deepEqual(toolNames, ["solidity_triage", "token_risk_brief", "video_storyboard"]);
+
+    // 4. unpaid tools/call must return HTTP 402 with PAYMENT-REQUIRED header
+    const toolCall = {
+      name: "token_risk_brief",
+      arguments: { chain: "base", address: BASE_USDC },
+    };
+    const unpaidRes = await fetch(mcpUrl, {
+      method: "POST",
+      headers: { ...commonHeaders, "Mcp-Session-Id": sessionId },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 3, method: "tools/call", params: toolCall }),
+    });
+    assert.equal(unpaidRes.status, 402);
+    const unpaidHeader = unpaidRes.headers.get("payment-required");
+    assert.ok(unpaidHeader);
+    const unpaidChallenge = JSON.parse(Buffer.from(unpaidHeader, "base64").toString("utf8"));
+    assert.equal(unpaidChallenge.x402Version, 2);
+    assert.equal(unpaidChallenge.accepts[0].amount, "20000");
+    assert.equal(unpaidChallenge.accepts[0].payTo, PAY_TO);
+
+    // 5. invalid (all-zero) PAYMENT-SIGNATURE must produce a distinguishable x402 rejection
+    const accepted = unpaidChallenge.accepts[0];
+    const now = Math.floor(Date.now() / 1000);
+    const bogusPayment = {
+      x402Version: 2,
+      resource: unpaidChallenge.resource,
+      accepted,
+      payload: {
+        signature: `0x${"00".repeat(65)}`,
+        authorization: {
+          from: "0x000000000000000000000000000000000000dEaD",
+          to: accepted.payTo,
+          value: String(accepted.amount),
+          validAfter: String(now - 60),
+          validBefore: String(now + 120),
+          nonce: "0x" + "11".repeat(32),
+        },
+      },
+      ...(unpaidChallenge.extensions ? { extensions: unpaidChallenge.extensions } : {}),
+    };
+    const encodedBogus = Buffer.from(JSON.stringify(bogusPayment)).toString("base64");
+    const badPayRes = await fetch(mcpUrl, {
+      method: "POST",
+      headers: {
+        ...commonHeaders,
+        "Mcp-Session-Id": sessionId,
+        "PAYMENT-SIGNATURE": encodedBogus,
+        "X-PAYMENT": encodedBogus,
+      },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 4, method: "tools/call", params: toolCall }),
+    });
+    assert.equal(badPayRes.status, 402);
+    const badHeader = badPayRes.headers.get("payment-required");
+    assert.ok(badHeader);
+    const badChallenge = JSON.parse(Buffer.from(badHeader, "base64").toString("utf8"));
+    assert.ok(badChallenge.error, "Invalid payment must include error reason in PaymentRequired");
+    assert.notEqual(badChallenge.error, unpaidChallenge.error);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
