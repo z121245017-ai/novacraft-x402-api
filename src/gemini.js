@@ -1,28 +1,44 @@
 import { GoogleGenAI } from "@google/genai";
 
 /**
- * Synthesizes structured JSON using Gemini when GEMINI_API_KEY is configured,
+ * Synthesizes structured JSON using Vertex AI (Cloud Run native ADC) or Gemini API Key,
  * falling back deterministically without crashing when absent or on API errors.
  */
 export async function synthesizeJson({
-  apiKey,
+  useVertexAi = false,
+  vertexProjectId = "",
+  vertexLocation = "us-central1",
+  apiKey = "",
   model = "gemini-2.5-flash",
   systemInstruction,
   prompt,
   fallback,
   timeoutMs = 15000,
 }) {
-  if (!apiKey || !String(apiKey).trim()) {
+  let ai;
+  let mode = "deterministic_only";
+
+  if (useVertexAi && String(vertexProjectId || "").trim()) {
+    mode = "vertexai";
+    ai = new GoogleGenAI({
+      vertexai: true,
+      project: String(vertexProjectId).trim(),
+      location: String(vertexLocation || "us-central1").trim(),
+    });
+  } else if (apiKey && String(apiKey).trim()) {
+    mode = "api_key";
+    ai = new GoogleGenAI({ apiKey: String(apiKey).trim() });
+  } else {
     return {
       enabled: false,
+      mode,
       model: null,
       data: fallback,
-      note: "GEMINI_API_KEY not set; deterministic output returned",
+      note: "Neither Vertex AI nor GEMINI_API_KEY configured; deterministic output returned",
     };
   }
 
   try {
-    const ai = new GoogleGenAI({ apiKey: String(apiKey).trim() });
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -42,16 +58,18 @@ export async function synthesizeJson({
     const parsed = JSON.parse(raw);
     return {
       enabled: true,
+      mode,
       model,
       data: parsed && typeof parsed === "object" ? { ...fallback, ...parsed } : fallback,
-      note: "Gemini synthesis applied",
+      note: `Gemini synthesis applied (${mode})`,
     };
   } catch (err) {
     return {
       enabled: false,
+      mode,
       model,
       data: fallback,
-      note: `Gemini fallback triggered: ${err?.message || "unknown error"}`,
+      note: `Gemini fallback triggered (${mode}): ${err?.message || "unknown error"}`,
     };
   }
 }

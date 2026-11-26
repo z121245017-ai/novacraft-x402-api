@@ -180,13 +180,20 @@ export function createApp(options = {}) {
   });
 
   app.get("/health", (_req, res) => {
+    const geminiMode =
+      config.useVertexAi && config.vertexProjectId
+        ? "vertexai"
+        : config.geminiApiKey
+        ? "api_key"
+        : "deterministic_only";
     res.json({
       ok: true,
       service: "novacraft-x402-api",
       network: config.network,
       facilitator: config.facilitatorUrl,
       payTo: config.payTo,
-      geminiConfigured: Boolean(config.geminiApiKey),
+      geminiConfigured: geminiMode !== "deterministic_only",
+      geminiMode,
       endpoints: endpointsCatalog,
     });
   });
@@ -236,6 +243,9 @@ export function createApp(options = {}) {
       };
 
       const ai = await synthesizeJson({
+        useVertexAi: config.useVertexAi,
+        vertexProjectId: config.vertexProjectId,
+        vertexLocation: config.vertexLocation,
         apiKey: config.geminiApiKey,
         model: config.geminiModel,
         systemInstruction:
@@ -273,6 +283,9 @@ export function createApp(options = {}) {
       };
 
       const ai = await synthesizeJson({
+        useVertexAi: config.useVertexAi,
+        vertexProjectId: config.vertexProjectId,
+        vertexLocation: config.vertexLocation,
         apiKey: config.geminiApiKey,
         model: config.geminiModel,
         systemInstruction:
@@ -297,6 +310,9 @@ export function createApp(options = {}) {
     try {
       const plan = buildStoryboardPlan(req.body || {});
       const ai = await synthesizeJson({
+        useVertexAi: config.useVertexAi,
+        vertexProjectId: config.vertexProjectId,
+        vertexLocation: config.vertexLocation,
         apiKey: config.geminiApiKey,
         model: config.geminiModel,
         systemInstruction:

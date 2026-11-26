@@ -43,7 +43,29 @@ test("1. Free discovery routes (/health, /.well-known/x402.json, /) return 200 w
     assert.equal(health.ok, true);
     assert.equal(health.payTo, PAY_TO);
     assert.equal(health.network, "eip155:8453");
+    assert.equal(health.geminiConfigured, false);
+    assert.equal(health.geminiMode, "deterministic_only");
     assert.equal(health.endpoints.length, 3);
+
+    const { app: vertexApp } = createApp({
+      config: {
+        port: 0,
+        payTo: PAY_TO,
+        network: "eip155:8453",
+        useVertexAi: true,
+        vertexProjectId: "test-proj",
+      },
+      syncFacilitatorOnStart: false,
+    });
+    const vertexSrv = http.createServer(vertexApp);
+    await new Promise((resolve) => vertexSrv.listen(0, "127.0.0.1", resolve));
+    try {
+      const vh = await fetch(`http://127.0.0.1:${vertexSrv.address().port}/health`).then((r) => r.json());
+      assert.equal(vh.geminiConfigured, true);
+      assert.equal(vh.geminiMode, "vertexai");
+    } finally {
+      await new Promise((resolve) => vertexSrv.close(resolve));
+    }
 
     assert.equal(wellKnownRes.status, 200);
     const manifest = await wellKnownRes.json();

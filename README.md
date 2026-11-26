@@ -1,4 +1,4 @@
-# NovaCraft x402 API (Base Mainnet USDC + Gemini + PayAI)
+# NovaCraft x402 API (Base Mainnet USDC + Vertex AI Gemini + PayAI)
 
 按次收取 **Base Mainnet USDC** 的 AI Agent 付费接口（`x402 v2`，无需 API Key、无需订阅、免 KYC 直收钱包 `0x445F7447532d3e9300194E289C7C023A5f3CFc9E`），接入 **PayAI Facilitator**（`https://facilitator.payai.network`）与 **Bazaar 自动索引扩展**。
 
@@ -11,24 +11,19 @@
 | `POST /api/v1/video-storyboard` | `$0.03` (`30000` atomic) | 4 幕 Veo 3 / Google Flow / MiniMax-H3 启动视频分镜与 Flow Music 提示词 |
 | `GET /health` & `GET /.well-known/x402.json` | 免费 | 健康检查与机器可读服务目录 |
 
-## 2. 绑定 AI Studio 用 \$440 赠金拿 `GEMINI_API_KEY`（约 1 分钟）
+## 2. 为什么默认走原生 Vertex AI 模式（最省钱）
 
-1. 用 `zhufan108@gmail.com` 打开 https://aistudio.google.com/apikey
-2. 点击 **Create API key**（若提示选择 Google Cloud 项目，选绑定了结算账号 **`010DBE-51F426-FA29BD`** 的项目）
-3. 复制生成的 `AIza...` 密钥——所有 Gemini API 调用优先走那 **\$440 赠金**。
+- **\$300 新户免费试用金** 抵扣 Cloud Run / Cloud Build 云基础设施；
+- **\$140 Ultra 开发者赠金（\$40 + \$100，有效期 1 年）** 直接抵扣 **Vertex AI** 上的 `gemini-2.5-flash` 调用费；
+- 全程使用 Cloud Run 服务账号原生 ADC 认证，**无需额外往 AI Studio 充值设置预付款**。
 
-## 3. 用 Cloud Shell 零本地环境一键部署到 Cloud Run（约 2 分钟）
+## 3. Cloud Shell 一键部署（自动补齐 IAM 权限并启用 Vertex AI）
 
-- 打开 https://shell.cloud.google.com （确认左上角项目已关联结算账号 `010DBE-51F426-FA29BD`），把本目录打包上传或推到仓库后执行：
+打开 https://shell.cloud.google.com/?project=project-fd4cf214-9f45-417f-b6c&show=terminal 执行：
 
 ```bash
-chmod +x deploy-cloudrun.sh
-PROJECT_ID="你的GCP项目ID" GEMINI_API_KEY="AIza你的Key" ./deploy-cloudrun.sh
+rm -rf novacraft-x402-api && git clone https://github.com/z121245017-ai/novacraft-x402-api.git && cd novacraft-x402-api && chmod +x deploy-cloudrun.sh
+PROJECT_ID="project-fd4cf214-9f45-417f-b6c" ./deploy-cloudrun.sh
 ```
 
-- 默认配置了 `--min-instances 0`，无人调用时缩容到 0，闲置费用为 **\$0**，有请求时才计费并直接扣您的 **\$440 Cloud 赠金**。
-
-## 4. 触发 Bazaar 自动索引
-
-在 PayAI / x402 生态里，端点在**首次成功完成一笔真实付费结算后**会被 Facilitator 自动抓取并收录进 Bazaar 发现目录：
-- 用您的 Base 小钱包（带 `$0.10` USDC + 少量 Base ETH gas）对部署后的 `/api/v1/token-risk-brief` 自付一笔 `$0.02` 真实调用，即可自动验证结算通路并触发收录。
+默认配置了 `--min-instances 0`，闲置零费用，有请求才计费。
