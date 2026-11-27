@@ -1,5 +1,7 @@
 # NovaCraft x402 API & Streamable HTTP MCP Server (Base Mainnet USDC + Vertex AI Gemini + PayAI)
 
+[![NovaCraft x402 API MCP connector](https://glama.ai/mcp/connectors/app.run.us-central1.novacraft-x402-api-981337528602/nova-craft-x402-api/badges/score.svg)](https://glama.ai/mcp/connectors/app.run.us-central1.novacraft-x402-api-981337528602/nova-craft-x402-api)
+
 Pay-per-call AI security, token risk, and launch storyboard server over **Streamable HTTP MCP** and **REST** using **x402 v2** on **Base Mainnet (`eip155:8453`)** USDC — no API keys, no subscriptions, no KYC. Payments settle directly to `0x445F7447532d3e9300194E289C7C023A5f3CFc9E` via **PayAI Facilitator** (`https://facilitator.payai.network`) with **Bazaar** discovery metadata.
 
 基于 **Base Mainnet (`eip155:8453`) USDC** 的按次付费 AI Agent 服务，同时提供 **Streamable HTTP MCP (`/mcp`)** 与 **REST API**：无需 API Key、无需订阅、免 KYC，直收钱包 `0x445F7447532d3e9300194E289C7C023A5f3CFc9E`，接入 **PayAI Facilitator**（`https://facilitator.payai.network`）与 **Bazaar 自动索引扩展**。
