@@ -110,10 +110,9 @@ export function buildRoutesConfig(config) {
         },
         inputSchema: {
           type: "object",
-          required: ["sourceCode"],
           properties: {
             contractName: { type: "string" },
-            sourceCode: { type: "string", minLength: 10 },
+            sourceCode: { type: "string" },
           },
         },
         output: {
@@ -149,9 +148,8 @@ export function buildRoutesConfig(config) {
         },
         inputSchema: {
           type: "object",
-          required: ["address"],
           properties: {
-            chain: { type: "string", default: "base" },
+            chain: { type: "string" },
             address: { type: "string" },
           },
         },
@@ -190,7 +188,6 @@ export function buildRoutesConfig(config) {
         },
         inputSchema: {
           type: "object",
-          required: ["productName", "tagline"],
           properties: {
             productName: { type: "string" },
             tagline: { type: "string" },
@@ -332,6 +329,7 @@ function sendX402ErrorResponse(res, response) {
 export function createApp(options = {}) {
   const config = loadConfig(options.config || {});
   const app = express();
+  app.set("trust proxy", true);
   app.use(express.json({ limit: "256kb" }));
 
   const endpointsCatalog = [
@@ -386,7 +384,7 @@ export function createApp(options = {}) {
     });
   });
 
-  app.get("/.well-known/x402.json", (req, res) => {
+  const handleWellKnownX402 = (req, res) => {
     const origin =
       config.serviceBaseUrl ||
       `${req.headers["x-forwarded-proto"] || req.protocol}://${req.get("host")}`;
@@ -401,7 +399,9 @@ export function createApp(options = {}) {
         url: `${origin}${ep.path}`,
       })),
     });
-  });
+  };
+  app.get("/.well-known/x402", handleWellKnownX402);
+  app.get("/.well-known/x402.json", handleWellKnownX402);
 
   // x402 payment middleware protecting paid REST & MCP endpoints
   const facilitatorClient =

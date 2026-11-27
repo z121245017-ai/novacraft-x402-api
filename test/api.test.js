@@ -32,9 +32,10 @@ async function startTestServer() {
 test("1. Free discovery routes (/health, /.well-known/x402.json, /) return 200 with wallet and 3 routes", async () => {
   const { server, baseUrl } = await startTestServer();
   try {
-    const [healthRes, wellKnownRes, htmlRes] = await Promise.all([
+    const [healthRes, wellKnownRes, wellKnownBareRes, htmlRes] = await Promise.all([
       fetch(`${baseUrl}/health`),
       fetch(`${baseUrl}/.well-known/x402.json`),
+      fetch(`${baseUrl}/.well-known/x402`),
       fetch(`${baseUrl}/`),
     ]);
 
@@ -68,7 +69,10 @@ test("1. Free discovery routes (/health, /.well-known/x402.json, /) return 200 w
     }
 
     assert.equal(wellKnownRes.status, 200);
+    assert.equal(wellKnownBareRes.status, 200);
     const manifest = await wellKnownRes.json();
+    const manifestBare = await wellKnownBareRes.json();
+    assert.deepEqual(manifestBare, manifest);
     assert.equal(manifest.x402Version, 2);
     assert.equal(manifest.payTo, PAY_TO);
     assert.equal(manifest.resources.length, 3);
@@ -112,7 +116,28 @@ test("2. Paid endpoints return live HTTP 402 with valid Base USDC payment-requir
       assert.equal(opt.payTo, PAY_TO);
       assert.equal(opt.asset.toLowerCase(), BASE_USDC.toLowerCase());
       assert.equal(opt.amount, item.amount);
+      const bodySchema = decoded.extensions?.bazaar?.schema?.properties?.input?.properties?.body || {};
+      const schemaStr = JSON.stringify(bodySchema);
+      assert.ok(!schemaStr.includes('"minLength"'), "Bazaar body schema must omit minLength");
+      assert.ok(!schemaStr.includes('"required"'), "Bazaar body schema must omit required arrays");
+      assert.ok(!schemaStr.includes('"default"'), "Bazaar body schema must omit default values");
     }
+
+    const proxiedRes = await fetch(`${baseUrl}/api/v1/solidity-triage`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Forwarded-Proto": "https",
+        "X-Forwarded-Host": "novacraft-x402-api.example.run.app",
+      },
+      body: JSON.stringify({ sourceCode: "contract A {}" }),
+    });
+    assert.equal(proxiedRes.status, 402);
+    const proxiedHeader = JSON.parse(Buffer.from(proxiedRes.headers.get("payment-required"), "base64").toString("utf8"));
+    assert.ok(
+      proxiedHeader.resource?.url?.startsWith("https://"),
+      `Expected https:// resource URL behind reverse proxy, got ${proxiedHeader.resource?.url}`
+    );
   } finally {
     await new Promise((resolve) => server.close(resolve));
   }
