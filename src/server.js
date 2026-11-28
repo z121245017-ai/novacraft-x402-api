@@ -19,7 +19,13 @@ import {
 import { ExactEvmScheme } from "@x402/evm/exact/server";
 import { bazaarResourceServerExtension, declareDiscoveryExtension } from "@x402/extensions/bazaar";
 
-import { loadConfig } from "./config.js";
+import {
+  BASE_MAINNET_CAIP2,
+  BASE_USDC_ADDRESS,
+  CELO_MAINNET_CAIP2,
+  CELO_USDC_ADDRESS,
+  loadConfig,
+} from "./config.js";
 import { synthesizeJson } from "./gemini.js";
 import { analyzeSolidity } from "./analyzers/solidity.js";
 import { analyzeTokenRisk } from "./analyzers/token.js";
@@ -28,11 +34,121 @@ import { buildStoryboardPlan } from "./analyzers/storyboard.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.resolve(__dirname, "..", "public");
 
+const NETWORK_DISCOVERY_METADATA = {
+  [BASE_MAINNET_CAIP2]: {
+    name: "Base Mainnet",
+    asset: BASE_USDC_ADDRESS,
+    symbol: "USDC",
+    decimals: 6,
+    assetTransferMethod: "eip3009",
+    extra: { name: "USD Coin", version: "2" },
+  },
+  [CELO_MAINNET_CAIP2]: {
+    name: "Celo Mainnet",
+    asset: CELO_USDC_ADDRESS,
+    symbol: "USDC",
+    decimals: 6,
+    assetTransferMethod: "eip3009",
+    extra: { name: "USDC", version: "2" },
+  },
+};
+
+function getConfiguredNetworks(config) {
+  return Array.isArray(config.networks) && config.networks.length > 0
+    ? config.networks
+    : [config.network];
+}
+
+function getFacilitatorMap(config) {
+  const networks = getConfiguredNetworks(config);
+  const map = {};
+  for (const net of networks) {
+    map[net] = net === config.celoNetwork ? config.celoFacilitatorUrl : config.facilitatorUrl;
+  }
+  return map;
+}
+
+function buildRouteAccepts(price, config) {
+  return getConfiguredNetworks(config).map((network) => ({
+    scheme: "exact",
+    price,
+    network,
+    payTo: config.payTo,
+  }));
+}
+
+function buildDiscoveryAccepts(amountAtomic, config) {
+  return getConfiguredNetworks(config).map((network) => {
+    const meta = NETWORK_DISCOVERY_METADATA[network];
+    return {
+      scheme: "exact",
+      network,
+      amount: String(amountAtomic),
+      asset: meta?.asset ?? "",
+      payTo: config.payTo,
+      maxTimeoutSeconds: 300,
+      extra: meta ? { ...meta.extra } : {},
+    };
+  });
+}
+
+function createFacilitatorClientForNetwork(network, url) {
+  const rawClient = new HTTPFacilitatorClient({ url });
+  const meta = NETWORK_DISCOVERY_METADATA[network];
+  const fallbackSupported = {
+    kinds: [
+      {
+        x402Version: 2,
+        scheme: "exact",
+        network,
+        ...(network === CELO_MAINNET_CAIP2 && meta
+          ? {
+              extra: {
+                extensions: ["eip2612GasSponsoring", "payment-identifier"],
+                defaultAsset: {
+                  asset: meta.asset,
+                  symbol: meta.symbol,
+                  decimals: meta.decimals,
+                  name: meta.extra.name,
+                  version: meta.extra.version,
+                  assetTransferMethod: meta.assetTransferMethod,
+                },
+              },
+            }
+          : {}),
+      },
+    ],
+    extensions:
+      network === CELO_MAINNET_CAIP2 ? ["eip2612GasSponsoring", "payment-identifier"] : [],
+    signers: {},
+  };
+
+  return {
+    url: rawClient.url,
+    async getSupported() {
+      try {
+        return await rawClient.getSupported();
+      } catch (err) {
+        console.warn(
+          `[x402] getSupported fallback activated for ${network} (${url}): ${err?.message || err}`
+        );
+        return fallbackSupported;
+      }
+    },
+    verify(paymentPayload, paymentRequirements) {
+      return rawClient.verify(paymentPayload, paymentRequirements);
+    },
+    settle(paymentPayload, paymentRequirements) {
+      return rawClient.settle(paymentPayload, paymentRequirements);
+    },
+  };
+}
+
 export const MCP_TOOLS = [
   {
     name: "solidity_triage",
     description:
-      "Deterministic + Gemini Solidity static security triage ($0.05 Base USDC). Detects reentrancy, tx.origin, delegatecall, stale Chainlink oracle, unchecked calls.",
+      "Deterministic + Gemini Solidity static security triage ($0.05 USDC on Base or Celo). Detects reentrancy, tx.origin, delegatecall, stale Chainlink oracle, unchecked calls.",
     inputSchema: {
       type: "object",
       required: ["sourceCode"],
@@ -49,16 +165,19 @@ export const MCP_TOOLS = [
   {
     name: "token_risk_brief",
     description:
-      "Live Base/EVM/Solana token liquidity, honeypot, tax, and concentration risk brief ($0.02 Base USDC) via DexScreener + GoPlus + Gemini.",
+      "Live Base/Celo/EVM/Solana token liquidity, honeypot, tax, and concentration risk brief ($0.02 USDC on Base or Celo) via DexScreener + GoPlus + Gemini.",
     inputSchema: {
       type: "object",
       required: ["address"],
       properties: {
-        chain: { type: "string", default: "base", examples: ["base"] },
+        chain: { type: "string", default: "base", examples: ["base", "celo"] },
         address: {
           type: "string",
           default: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-          examples: ["0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"],
+          examples: [
+            "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+            "0xcebA9300f2b948710d2653dD7B07f33A8B32118C",
+          ],
         },
       },
     },
@@ -66,7 +185,7 @@ export const MCP_TOOLS = [
   {
     name: "video_storyboard",
     description:
-      "Structured 4-scene Google Flow (Veo 3) / MiniMax-H3 launch video storyboard, visual prompts, and Flow Music score ($0.03 Base USDC).",
+      "Structured 4-scene Google Flow (Veo 3) / MiniMax-H3 launch video storyboard, visual prompts, and Flow Music score ($0.03 USDC on Base or Celo).",
     inputSchema: {
       type: "object",
       required: ["productName", "tagline"],
@@ -88,19 +207,12 @@ export const MCP_TOOLS = [
 
 export function buildRoutesConfig(config) {
   const solidityRoute = {
-    accepts: [
-      {
-        scheme: "exact",
-        price: "$0.05",
-        network: config.network,
-        payTo: config.payTo,
-      },
-    ],
+    accepts: buildRouteAccepts("$0.05", config),
     description:
       "Deterministic + Gemini Solidity static security triage (reentrancy, tx.origin, delegatecall, stale Chainlink oracle, unchecked calls).",
     mimeType: "application/json",
     serviceName: "NovaCraft Solidity Security Triage",
-    tags: ["security", "solidity", "audit", "evm", "gemini"],
+    tags: ["security", "solidity", "audit", "evm", "celo", "base", "gemini"],
     extensions: {
       ...declareDiscoveryExtension({
         bodyType: "json",
@@ -126,19 +238,12 @@ export function buildRoutesConfig(config) {
   };
 
   const tokenRoute = {
-    accepts: [
-      {
-        scheme: "exact",
-        price: "$0.02",
-        network: config.network,
-        payTo: config.payTo,
-      },
-    ],
+    accepts: buildRouteAccepts("$0.02", config),
     description:
-      "Live Base/EVM/Solana token liquidity, honeypot, tax, and concentration risk brief via DexScreener + GoPlus + Gemini.",
+      "Live Base/Celo/EVM/Solana token liquidity, honeypot, tax, and concentration risk brief via DexScreener + GoPlus + Gemini.",
     mimeType: "application/json",
     serviceName: "NovaCraft Token Risk Brief",
-    tags: ["defi", "token", "risk", "base", "honeypot"],
+    tags: ["defi", "token", "risk", "base", "celo", "honeypot"],
     extensions: {
       ...declareDiscoveryExtension({
         bodyType: "json",
@@ -164,14 +269,7 @@ export function buildRoutesConfig(config) {
   };
 
   const storyboardRoute = {
-    accepts: [
-      {
-        scheme: "exact",
-        price: "$0.03",
-        network: config.network,
-        payTo: config.payTo,
-      },
-    ],
+    accepts: buildRouteAccepts("$0.03", config),
     description:
       "Structured 4-scene Google Flow (Veo 3) / MiniMax-H3 launch video storyboard, visual prompts, and Flow Music score.",
     mimeType: "application/json",
@@ -328,30 +426,47 @@ function sendX402ErrorResponse(res, response) {
 
 export function createApp(options = {}) {
   const config = loadConfig(options.config || {});
+  const configuredNetworks = getConfiguredNetworks(config);
+  const facilitators = getFacilitatorMap(config);
   const app = express();
   app.set("trust proxy", true);
   app.use(express.json({ limit: "256kb" }));
+
+  // Normalize legacy/cross-client X-PAYMENT header to PAYMENT-SIGNATURE so @x402/core
+  // extracts incoming Base or Celo payment payloads consistently across REST and /mcp.
+  app.use((req, _res, next) => {
+    if (!req.headers["payment-signature"] && req.headers["x-payment"]) {
+      req.headers["payment-signature"] = req.headers["x-payment"];
+    }
+    next();
+  });
 
   const endpointsCatalog = [
     {
       method: "POST",
       path: "/api/v1/solidity-triage",
       priceUsd: "$0.05",
+      amountAtomic: "50000",
       network: config.network,
+      networks: configuredNetworks,
       description: "Solidity vulnerability triage & remediation plan",
     },
     {
       method: "POST",
       path: "/api/v1/token-risk-brief",
       priceUsd: "$0.02",
+      amountAtomic: "20000",
       network: config.network,
+      networks: configuredNetworks,
       description: "DEX liquidity + GoPlus honeypot/tax token risk brief",
     },
     {
       method: "POST",
       path: "/api/v1/video-storyboard",
       priceUsd: "$0.03",
+      amountAtomic: "30000",
       network: config.network,
+      networks: configuredNetworks,
       description: "4-scene Veo 3 / Flow launch video storyboard & music prompt",
     },
   ];
@@ -376,7 +491,9 @@ export function createApp(options = {}) {
       ok: true,
       service: "novacraft-x402-api",
       network: config.network,
+      networks: configuredNetworks,
       facilitator: config.facilitatorUrl,
+      facilitators,
       payTo: config.payTo,
       geminiConfigured: geminiMode !== "deterministic_only",
       geminiMode,
@@ -388,28 +505,64 @@ export function createApp(options = {}) {
     const origin =
       config.serviceBaseUrl ||
       `${req.headers["x-forwarded-proto"] || req.protocol}://${req.get("host")}`;
+    const supportedNetworks = configuredNetworks.map((network) => {
+      const meta = NETWORK_DISCOVERY_METADATA[network];
+      return {
+        network,
+        name: meta?.name ?? network,
+        scheme: "exact",
+        asset: meta?.asset ?? "",
+        symbol: meta?.symbol ?? "USDC",
+        decimals: meta?.decimals ?? 6,
+        assetTransferMethod: meta?.assetTransferMethod ?? "eip3009",
+        payTo: config.payTo,
+        facilitator: facilitators[network],
+      };
+    });
     res.json({
       x402Version: 2,
       service: "NovaCraft x402 API",
       payTo: config.payTo,
       network: config.network,
+      networks: configuredNetworks,
       facilitator: config.facilitatorUrl,
+      facilitators,
+      supportedNetworks,
+      mcpEndpoint: `${origin}/mcp`,
       resources: endpointsCatalog.map((ep) => ({
         ...ep,
         url: `${origin}${ep.path}`,
+        accepts: buildDiscoveryAccepts(ep.amountAtomic, config),
       })),
     });
   };
   app.get("/.well-known/x402", handleWellKnownX402);
   app.get("/.well-known/x402.json", handleWellKnownX402);
 
-  // x402 payment middleware protecting paid REST & MCP endpoints
-  const facilitatorClient =
-    options.facilitatorClient || new HTTPFacilitatorClient({ url: config.facilitatorUrl });
+  // x402 payment middleware protecting paid REST & MCP endpoints across Base + Celo facilitators
+  const facilitatorClients = options.facilitatorClients
+    ? options.facilitatorClients
+    : options.facilitatorClient
+    ? [options.facilitatorClient]
+    : configuredNetworks.map((net) => createFacilitatorClientForNetwork(net, facilitators[net]));
 
-  const resourceServer = new x402ResourceServer(facilitatorClient)
-    .register(config.network, new ExactEvmScheme())
-    .registerExtension(bazaarResourceServerExtension);
+  const resourceServer = new x402ResourceServer(facilitatorClients);
+  for (const net of configuredNetworks) {
+    resourceServer.register(net, new ExactEvmScheme());
+  }
+  resourceServer.registerExtension(bazaarResourceServerExtension);
+
+  // Coalesce concurrent startup initialize() calls shared between /mcp and REST paymentMiddleware
+  const rawResourceInit = resourceServer.initialize.bind(resourceServer);
+  let initInFlight = null;
+  resourceServer.initialize = () => {
+    if (!initInFlight) {
+      initInFlight = rawResourceInit().finally(() => {
+        initInFlight = null;
+      });
+    }
+    return initInFlight;
+  };
 
   const routes = buildRoutesConfig(config);
   const syncOnStart = options.syncFacilitatorOnStart ?? true;
@@ -450,7 +603,7 @@ export function createApp(options = {}) {
         result: {
           protocolVersion: "2025-06-18",
           capabilities: { tools: {} },
-          serverInfo: { name: "novacraft-x402-api", version: "1.0.0" },
+          serverInfo: { name: "novacraft-x402-api", version: "1.1.0" },
         },
       });
     }
@@ -649,8 +802,8 @@ if (isMain) {
   const { app, config } = createApp();
   app.listen(config.port, () => {
     console.log(
-      `novacraft-x402-api listening on :${config.port} | network=${config.network} | payTo=${config.payTo} | facilitator=${config.facilitatorUrl} | gemini=${Boolean(
-        config.geminiApiKey
+      `novacraft-x402-api listening on :${config.port} | networks=${config.networks.join(",")} | payTo=${config.payTo} | facilitators=${config.facilitatorUrl},${config.celoFacilitatorUrl} | gemini=${Boolean(
+        config.geminiApiKey || (config.useVertexAi && config.vertexProjectId)
       )}`
     );
   });

@@ -1,12 +1,12 @@
 {
   "name": "novacraft-x402-api",
-  "version": "1.0.0",
-  "description": "Base USDC x402 AI security & video storyboard API powered by Gemini and PayAI facilitator",
+  "version": "1.1.0",
+  "description": "Dual-network Base & Celo Mainnet USDC x402 AI security & video storyboard API powered by Gemini, PayAI, and Celo x402 facilitator",
   "type": "module",
   "private": true,
   "scripts": {
     "start": "node src/server.js",
-    "test": "node --test test/api.test.js"
+    "test": "NODE_USE_ENV_PROXY=1 node --test test/api.test.js"
   },
   "dependencies": {
     "@google/genai": "^3.6.1",

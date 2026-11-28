@@ -1,10 +1,10 @@
-# NovaCraft x402 API & Streamable HTTP MCP Server (Base Mainnet USDC + Vertex AI Gemini + PayAI)
+# NovaCraft x402 API & Streamable HTTP MCP Server (Base + Celo Mainnet USDC • Vertex AI Gemini)
 
 [![NovaCraft x402 API MCP connector](https://glama.ai/mcp/connectors/app.run.us-central1.novacraft-x402-api-981337528602/nova-craft-x402-api/badges/score.svg)](https://glama.ai/mcp/connectors/app.run.us-central1.novacraft-x402-api-981337528602/nova-craft-x402-api)
 
-Pay-per-call AI security, token risk, and launch storyboard server over **Streamable HTTP MCP** and **REST** using **x402 v2** on **Base Mainnet (`eip155:8453`)** USDC — no API keys, no subscriptions, no KYC. Payments settle directly to `0x445F7447532d3e9300194E289C7C023A5f3CFc9E` via **PayAI Facilitator** (`https://facilitator.payai.network`) with **Bazaar** discovery metadata.
+Pay-per-call AI security, token risk, and launch storyboard server over **Streamable HTTP MCP** and **REST** using **x402 v2** on **Base Mainnet (`eip155:8453`)** and **Celo Mainnet (`eip155:42220`)** USDC — no API keys, no subscriptions, no KYC. Payments settle directly to `0x445F7447532d3e9300194E289C7C023A5f3CFc9E` via **PayAI Facilitator** (`https://facilitator.payai.network`) for Base and the **Official Celo x402 Facilitator** (`https://api.x402.celo.org`) for Celo, with **Bazaar** discovery metadata.
 
-基于 **Base Mainnet (`eip155:8453`) USDC** 的按次付费 AI Agent 服务，同时提供 **Streamable HTTP MCP (`/mcp`)** 与 **REST API**：无需 API Key、无需订阅、免 KYC，直收钱包 `0x445F7447532d3e9300194E289C7C023A5f3CFc9E`，接入 **PayAI Facilitator**（`https://facilitator.payai.network`）与 **Bazaar 自动索引扩展**。
+基于 **Base Mainnet (`eip155:8453`)** 与 **Celo Mainnet (`eip155:42220`) USDC** 的双链按次付费 AI Agent 服务，同时提供 **Streamable HTTP MCP (`/mcp`)** 与 **REST API**：无需 API Key、无需订阅、免 KYC，直收钱包 `0x445F7447532d3e9300194E289C7C023A5f3CFc9E`，自动按 `PAYMENT-SIGNATURE` / `X-PAYMENT` 所选网络路由至 **PayAI Facilitator**（Base）或 **Celo 官方 x402 Facilitator**（`https://api.x402.celo.org`）。
 
 ---
 
@@ -14,15 +14,18 @@ Pay-per-call AI security, token risk, and launch storyboard server over **Stream
   `https://novacraft-x402-api-981337528602.us-central1.run.app/mcp`
   - Protocol: JSON-RPC 2.0 over Streamable HTTP (`POST /mcp`, MCP `2025-06-18`)
   - Free discovery methods: `initialize`, `notifications/initialized`, `ping`, `tools/list`
-  - Paid execution: `tools/call` enforces x402 Base Mainnet USDC via `PAYMENT-REQUIRED` / `PAYMENT-SIGNATURE` headers (and `X-PAYMENT` fallback)
+  - Paid execution: `tools/call` enforces dual-network x402 USDC (`eip155:8453` Base + `eip155:42220` Celo) via `PAYMENT-REQUIRED` / `PAYMENT-SIGNATURE` headers (and `X-PAYMENT` fallback)
 - **Live Discovery & Health (Free / 免费)**:
   - Health & runtime config: `https://novacraft-x402-api-981337528602.us-central1.run.app/health`
-  - x402 v2 service catalog: `https://novacraft-x402-api-981337528602.us-central1.run.app/.well-known/x402.json`
+  - x402 v2 service catalog: `https://novacraft-x402-api-981337528602.us-central1.run.app/.well-known/x402` & `/.well-known/x402.json`
 - **Live Paid REST Routes**:
   - `POST https://novacraft-x402-api-981337528602.us-central1.run.app/api/v1/solidity-triage`
   - `POST https://novacraft-x402-api-981337528602.us-central1.run.app/api/v1/token-risk-brief`
   - `POST https://novacraft-x402-api-981337528602.us-central1.run.app/api/v1/video-storyboard`
-- **Payout Address / 收款地址 (Base Mainnet USDC)**: `0x445F7447532d3e9300194E289C7C023A5f3CFc9E`
+- **Supported Settlement Rails / 支持结算网络**:
+  - **Base Mainnet (`eip155:8453`)**: USDC `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` (`eip3009`) → `https://facilitator.payai.network`
+  - **Celo Mainnet (`eip155:42220`)**: USDC `0xcebA9300f2b948710d2653dD7B07f33A8B32118C` (`eip3009`) → `https://api.x402.celo.org`
+- **Payout Address / 收款地址 (Base & Celo USDC)**: `0x445F7447532d3e9300194E289C7C023A5f3CFc9E`
 - **Directory Listing**: [`paidmcp/directory#33`](https://github.com/paidmcp/directory/pull/33) · Companion stdio CLI/MCP: [`z121245017-ai/novacraft-mcp`](https://github.com/z121245017-ai/novacraft-mcp)
 
 ---

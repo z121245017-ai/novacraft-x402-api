@@ -1,9 +1,12 @@
 const CHAIN_ID_MAP = {
   ethereum: "1",
   eth: "1",
+  optimism: "10",
   bsc: "56",
   polygon: "137",
   arbitrum: "42161",
+  celo: "42220",
+  avalanche: "43114",
   base: "8453",
   solana: "solana",
 };
